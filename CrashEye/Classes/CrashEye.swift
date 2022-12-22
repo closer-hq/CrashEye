@@ -20,7 +20,7 @@ public protocol CrashEyeDelegate: NSObjectProtocol {
 //--------------------------------------------------------------------------
 class WeakCrashEyeDelegate: NSObject {
     weak var delegate: CrashEyeDelegate?
-    
+
     init(delegate: CrashEyeDelegate) {
         super.init()
         self.delegate = delegate
@@ -39,13 +39,13 @@ public enum CrashModelType:Int {
 // MARK: - CrashModel
 //--------------------------------------------------------------------------
 open class CrashModel: NSObject {
-    
+
     open var type: CrashModelType!
     open var name: String!
     open var reason: String!
     open var appinfo: String!
     open var callStack: String!
-    
+
     init(type:CrashModelType,
          name:String,
          reason:String,
@@ -69,12 +69,12 @@ private var app_old_exceptionHandler:(@convention(c) (NSException) -> Swift.Void
 // MARK: - CrashEye
 //--------------------------------------------------------------------------
 public class CrashEye: NSObject {
-    
+
     //--------------------------------------------------------------------------
     // MARK: OPEN PROPERTY
     //--------------------------------------------------------------------------
     public private(set) static var isOpen: Bool = false
-    
+
     //--------------------------------------------------------------------------
     // MARK: OPEN FUNCTION
     //--------------------------------------------------------------------------
@@ -83,7 +83,7 @@ public class CrashEye: NSObject {
         self.delegates = self.delegates.filter {
             return $0.delegate != nil
         }
-        
+
         // judge if contains the delegate from parameter
         let contains = self.delegates.contains {
             return $0.delegate?.hash == delegate.hash
@@ -93,26 +93,26 @@ public class CrashEye: NSObject {
             let week = WeakCrashEyeDelegate(delegate: delegate)
             self.delegates.append(week)
         }
-        
+
         if self.delegates.count > 0 {
             self.open()
         }
     }
-    
+
     open class func remove(delegate:CrashEyeDelegate) {
         self.delegates = self.delegates.filter {
             // filter null weak delegate
             return $0.delegate != nil
-            }.filter {
-                // filter the delegate from parameter
-                return $0.delegate?.hash != delegate.hash
+        }.filter {
+            // filter the delegate from parameter
+            return $0.delegate?.hash != delegate.hash
         }
-        
+
         if self.delegates.count == 0 {
             self.close()
         }
     }
-    
+
     //--------------------------------------------------------------------------
     // MARK: PRIVATE FUNCTION
     //--------------------------------------------------------------------------
@@ -121,12 +121,12 @@ public class CrashEye: NSObject {
             return
         }
         CrashEye.isOpen = true
-        
+
         app_old_exceptionHandler = NSGetUncaughtExceptionHandler()
         NSSetUncaughtExceptionHandler(CrashEye.RecieveException)
         self.setCrashSignalHandler()
     }
-    
+
     private class func close() {
         guard self.isOpen == true else {
             return
@@ -134,7 +134,7 @@ public class CrashEye: NSObject {
         CrashEye.isOpen = false
         NSSetUncaughtExceptionHandler(app_old_exceptionHandler)
     }
-    
+
     private class func setCrashSignalHandler(){
         signal(SIGABRT, CrashEye.RecieveSignal)
         signal(SIGILL, CrashEye.RecieveSignal)
@@ -145,23 +145,23 @@ public class CrashEye: NSObject {
         //http://stackoverflow.com/questions/36325140/how-to-catch-a-swift-crash-and-do-some-logging
         signal(SIGTRAP, CrashEye.RecieveSignal)
     }
-    
+
     private static let RecieveException: @convention(c) (NSException) -> Swift.Void = {
         (exteption) -> Void in
         if (app_old_exceptionHandler != nil) {
             app_old_exceptionHandler!(exteption);
         }
-        
+
         guard CrashEye.isOpen == true else {
             return
         }
-        
+
         let callStack = exteption.callStackSymbols.joined(separator: "\r")
         let reason = exteption.reason ?? ""
         let name = exteption.name
         let appinfo = CrashEye.appInfo()
-        
-        
+
+
         let model = CrashModel(type:CrashModelType.exception,
                                name:name.rawValue,
                                reason:reason,
@@ -171,30 +171,30 @@ public class CrashEye: NSObject {
             delegate.delegate?.crashEyeDidCatchCrash(with: model)
         }
     }
-    
+
     private static let RecieveSignal : @convention(c) (Int32) -> Void = {
         (signal) -> Void in
-        
+
         guard CrashEye.isOpen == true else {
             return
         }
-        
+
         var stack = Thread.callStackSymbols
         stack.removeFirst(2)
         let callStack = stack.joined(separator: "\r")
         let reason = "Signal \(CrashEye.name(of: signal))(\(signal)) was raised.\n"
         let appinfo = CrashEye.appInfo()
-        
+
         let model = CrashModel(type:CrashModelType.signal,
                                name:CrashEye.name(of: signal),
                                reason:reason,
                                appinfo:appinfo,
                                callStack:callStack)
-        
+
         for delegate in CrashEye.delegates {
             delegate.delegate?.crashEyeDidCatchCrash(with: model)
         }
-        
+
         CrashEye.killApp()
     }
     
@@ -208,40 +208,40 @@ public class CrashEye: NSObject {
         return "App: \(displayName) \(shortVersion)(\(version))\n" +
             "Device:\(deviceModel)\n" + "OS Version:\(systemName) \(systemVersion)"
     }
-    
-    
+
+
     private class func name(of signal:Int32) -> String {
         switch (signal) {
-        case SIGABRT:
-            return "SIGABRT"
-        case SIGILL:
-            return "SIGILL"
-        case SIGSEGV:
-            return "SIGSEGV"
-        case SIGFPE:
-            return "SIGFPE"
-        case SIGBUS:
-            return "SIGBUS"
-        case SIGPIPE:
-            return "SIGPIPE"
-        default:
-            return "OTHER"
+            case SIGABRT:
+                return "SIGABRT"
+            case SIGILL:
+                return "SIGILL"
+            case SIGSEGV:
+                return "SIGSEGV"
+            case SIGFPE:
+                return "SIGFPE"
+            case SIGBUS:
+                return "SIGBUS"
+            case SIGPIPE:
+                return "SIGPIPE"
+            default:
+                return "OTHER"
         }
     }
-    
+
     private class func killApp(){
         NSSetUncaughtExceptionHandler(nil)
-        
+
         signal(SIGABRT, SIG_DFL)
         signal(SIGILL, SIG_DFL)
         signal(SIGSEGV, SIG_DFL)
         signal(SIGFPE, SIG_DFL)
         signal(SIGBUS, SIG_DFL)
         signal(SIGPIPE, SIG_DFL)
-        
+
         kill(getpid(), SIGKILL)
     }
-    
+
     //--------------------------------------------------------------------------
     // MARK: PRIVATE PROPERTY
     //--------------------------------------------------------------------------
