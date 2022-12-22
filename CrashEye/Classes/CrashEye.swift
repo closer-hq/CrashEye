@@ -198,15 +198,32 @@ public class CrashEye: NSObject {
         CrashEye.killApp()
     }
     
+    private class func platform() -> String {
+        var size = 0
+        sysctlbyname("hw.machine", nil, &size, nil, 0)
+        var machine = [CChar](repeating: 0,  count: size)
+        sysctlbyname("hw.machine", &machine, &size, nil, 0)
+        return String(cString: machine)
+    }
+
     private class func appInfo() -> String {
         let displayName = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") ?? ""
         let shortVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") ?? ""
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") ?? ""
+#if os(iOS)
         let deviceModel = UIDevice.current.model
         let systemName = UIDevice.current.systemName
         let systemVersion = UIDevice.current.systemVersion
-        return "App: \(displayName) \(shortVersion)(\(version))\n" +
-            "Device:\(deviceModel)\n" + "OS Version:\(systemName) \(systemVersion)"
+#elseif os(OSX)
+        let deviceModel = platform()
+        let systemName = "macOS"
+        let systemVersion = NSAppKitVersion.current.rawValue
+#endif
+      return [
+        "App: \(displayName) \(shortVersion)(\(version))",
+        "Device: \(deviceModel)",
+        "OS Version: \(systemName) \(systemVersion)",
+      ].joined(separator: "\n")
     }
 
 
